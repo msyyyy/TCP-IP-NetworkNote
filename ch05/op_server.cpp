@@ -4,10 +4,13 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <iostream>
+#include <sstream>
+#include <string>
 
 #define BUF_SIZE 1024
 void error_handling(char *message);
-char *calc(char *message);
+char *calc(std::string s);
 char res[10];
 
 int main(int argc,char *argv[])
@@ -27,7 +30,7 @@ int main(int argc,char *argv[])
 
     serv_sock = socket(PF_INET,SOCK_STREAM,0);
     if(serv_sock==-1)
-        error_handling("socket() error");
+        error_handling((char *)"socket() error");
     
     memset(&serv_adr,0,sizeof(serv_adr));
     serv_adr.sin_family = AF_INET;
@@ -35,16 +38,16 @@ int main(int argc,char *argv[])
     serv_adr.sin_port= htons(atoi(argv[1]));
 
     if(bind(serv_sock,(struct sockaddr *)&serv_adr,sizeof(serv_adr))==-1)
-        error_handling("bind() error");
+        error_handling((char *)"bind() error");
     
     if(listen(serv_sock,5)==-1)
-        error_handling("listen() error");
+        error_handling((char *)"listen() error");
     
     clnt_adr_sz = sizeof(clnt_adr);
 
     clnt_sock = accept(serv_sock,(struct sockaddr *)&clnt_adr, &clnt_adr_sz);
     if(clnt_sock==-1)
-        error_handling("accept() error");
+        error_handling((char *)"accept() error");
     
     str_len = read(clnt_sock,message,BUF_SIZE);
     write(clnt_sock,calc(message),str_len);
@@ -58,52 +61,36 @@ void error_handling(char *message)
     fputc('\n', stderr);
     exit(1);
 }
-char *calc(char *s)
+char *calc(std::string s)
 {
-    int len = strlen(s), i;
-    int n = 0;
-    for (i = 0; i < len; i++)
-        if (s[i] == ' ')
-        {
-            i++;
-            break;
-        }
-        else
-            n = n * 10 + (s[i] - '0');
-    int *num = malloc(sizeof(int) * n);
-    int tot = 0, x = 0;
+    std::istringstream strm(s);
+    int n;
+    int a[20];
+    char p;
+    strm >> n;
+    for(int i=0;i<n;i++)
+        strm >> a[i];
+    strm>>p;
+    switch (p)
+    {
+    case '+':
+        for(int i=1;i<n;i++)
+            a[0]+=a[i];
+        break;
+    case '-':
+        for(int i=1;i<n;i++)
+            a[0]-=a[i];
+        break;
+    case '*':
+         for(int i=1;i<n;i++)
+            a[0]*=a[i];
+        break;
+    }
+    std::stringstream strm1;
+    strm1<<a[0];
+    std::string ss;
+    strm1>>ss;
+    char *s1=(char *)ss.c_str();
+    return s1;
 
-    for (; i < len; i++)
-    {
-        if (s[i] == '+' || s[i] == '*' || s[i] == '-')
-            break;
-        if (s[i] == ' ')
-        {
-            num[tot++] = x;
-            x = 0;
-        }
-        else
-            x = x * 10 + (s[i] - '0');
-    }
-    int ans = 0;
-    if (s[i] == '+')
-    {
-        for (int i = 0; i < tot; i++)
-            ans += num[i];
-    }
-    else if (s[i] == '*')
-    {
-        ans = 1;
-        for (int i = 0; i < tot; i++)
-            ans *= num[i];
-    }
-    else if (s[i] == '-')
-    {
-        ans = num[0];
-        for (int i = 1; i < tot; i++)
-            ans -= num[i];
-    }
-    free(num);
-    sprintf(res, "%d", ans);
-    return res;
 }

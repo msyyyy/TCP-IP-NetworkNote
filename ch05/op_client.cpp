@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 
     sock = socket(PF_INET, SOCK_STREAM, 0);
     if (sock == -1)
-        error_handling("socket() error");
+        error_handling((char *)"socket() error");
     
     memset(&serv_adr, 0, sizeof(serv_adr));
     serv_adr.sin_family = AF_INET;
@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     serv_adr.sin_port = htons(atoi(argv[2]));
 
     if (connect(sock, (struct sockaddr *)&serv_adr, sizeof(serv_adr)) == -1)
-        error_handling("connect() error!");
+        error_handling((char *)"connect() error!");
     else
         printf("连接成功!\n");
 

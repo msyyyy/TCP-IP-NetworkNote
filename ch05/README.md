@@ -36,14 +36,21 @@ str_len = read(sock, message, BUF_SIZE - 1);
 2. 请求做乘法运算，客户端会收到3*5*9的结果
 3. 如果向服务器传递4,3,2的同时要求做减法，则返回4-3-2的运算结果。
 
-[op_client.c](./op_client.c);
+[op_server.cpp](./op_server.cpp);
 
-[op_server.c](./op_server.c);
+[op_server.cpp](./op_server.cpp);
 
 编译
 ```
+c版本
 gcc op_client.c -o opclient
 gcc op_server.c -o opserver
+```
+
+```
+c++11版本
+g++ -std=c++11 -o opserver op_server.cpp
+g++ -std=c++11 -o opclient op_client.cpp 
 ```
 
 运行
