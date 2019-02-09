@@ -109,4 +109,177 @@ pid_t wait(int *statloc);
 ```
 调用此函数时如果已有子进程终止，那么子进程终止时传递的返回值(exit函数的参数值，main函数的return返回值)将保存到该函数的参数所指的内存空间。但函数参数指向的单位中还包含其他信息，因此需要通过下列宏进行分类
 - WIFEXITED 子进程正常终止时返回'真'(true)
-- WEXITSTATUS返回子进程的返回值
+- WEXITSTATUS 返回子进程的返回值
+
+```c++
+int status;
+wait(&status);
+if(WIFEXITED(status)) // 是正常终止的嘛
+{
+    puts("正常终止");
+    printf("子进程返回值为  %d", WEXITSTATUS(status) );
+}
+```
+
+[wait.c](./wait.c)
+
+```
+gcc wait.c -o wait
+./wait
+```
+
+![](https://s2.ax1x.com/2019/02/09/kN2Eo8.png)
+
+![](https://s2.ax1x.com/2019/02/09/kN2eJg.png)
+
+通过调用ps au 命令可发现只有父进程，没有子进程，这是因为调用了wait函数，完全销毁了该程序，另外两个子进程终止时返回的3和7传递到了父进程
+
+调用wait函数时，如果没有已终止的子进程，那么程序将阻塞直到有子进程终止，因此需要谨慎调用该函数
+
+#### 10.2.4 销毁僵尸进程 2：  使用waitpid函数
+
+```c++
+#include <sys/wait.h>
+// 成功时返回终止的子进程ID(或 0)，失败时返回-1
+pid_t waitpid(pid_t pid, int * statloc,int options);
+
+/*
+pid 等待终止的目标子进程ID，若传递-1，则与wait函数相同，可以等待任意子进程终止
+statloc 与wait函数的statloc参数具有相同含义
+options 传递常量 WNOHANG ，即使没有终止的子进程也不会进入阻塞状态，而是返回0并退出函数
+*/
+```
+调用waitpid函数时，程序不会阻塞
+
+[waitpid.c](./waitpid.c)
+
+```
+gcc waitpid.c -o waitpid
+./waitpid
+```
+
+![](https://s2.ax1x.com/2019/02/09/kNRkc9.png)
+
+可以看出共执行了5此输出sleep，说明waitpid 函数并未阻塞
+
+### 10.3 信号处理
+
+子进程究竟何时终止? 调用waitpid函数后要无休止的等待吗？
+
+#### 10.3.1 向操作系统求助
+
+子进程终止的识别主体是操作系统，因此操作系统若能告诉父进程，子进程的终止。然后父进程可以暂时放下工作用于处理子进程的终止。
+
+信号处理机制:  信号指特定事件发生时由操作系统向进程发送的信息
+
+#### 10.3.2 关于JAVA的题外话: 保持开发思维
+
+JAVA在编程语言层面支持进程或线程，但C语言及c++语言并不支持.JAVA为了保持平台移植性，以独立于操作系统的方式提供进程和线程的创建方法
+
+#### 10.3.3 信号与signal函数
+
+进程发现直接子进程结束时，请求操作系统调用特定函数，该请求通过调用signal函数完成(也成该函数为信号注册函数)
+
+```c++
+#include <signal.h>
+
+void (* signal(int signo, void (*func)(int)))(int);
+// 为了在产生信号时调用，返回之前注册的函数指针
+```
+
+第一个参数为特殊情况信息，第二个参数为特殊情况下将要调用的函数的地址值(指针),发生第一个参数代表的情况时，调用第二个参数所指的函数。下面给出signal中注册的部分特殊情况
+- SIGALRM ： 已到通过调用alarm函数注册的时间
+- SIGINT ：  输入CTRL + C
+- SIGCHLD ： 子进程终止
+
+```c++
+signal(SIGCHLD,mychild);
+```
+
+信号注册后，发生注册信号时(注册的情况发生时)，操作系统将调用对应函数。
+
+```c++
+#include<unistd.h>
+
+unsigned int alarm (unsigned int seconds);
+// 返回0 或 秒为单位的距SIGALRM信号发生所剩时间
+```
+如果调用该函数的同时传递一个正整数型，相应时间后(以秒为单位)将产生SIGALRM信号，若传递0 ，则之前对SIGSLRM信号的预约将取消。如果通过该函数预约信号后为指定该信号对应的处理函数，则(通过调用signal)终止进程。
+
+[signal.c](./signal.c)
+
+```
+gcc signal.c -o signal
+./signal
+```
+
+上面没任何输入，下面输入了CTRL+ C
+
+![](https://s2.ax1x.com/2019/02/09/kUpwPU.png)
+
+我们要知道，发生信号时将唤醒由于调用sleep函数而进入阻塞状态的进程，因为进程处于睡眠状态时无法调用函数。而且，进程一旦被唤醒，就会再进入睡眠状态，即使未到sleep函数中规定的时间。
+
+
+#### 10.3.4 利用sigaction 函数进行信号处理
+
+sigaction比signal更稳定，可以取代后者。因为signal函数在UNIX系列的不同操作系统中可能存在区别，而sigaction没有不同
+
+```c++
+#include <signal.h>
+// 成功时返回0，失败时返回-1 
+int sigaction(int signo, const struct sigaction *act , struct sigaction *oldact);
+/*
+signo : 与signal函数相同，传递信号信息
+act: 对于第一个参数的信号处理函数（信号处理器）信息。
+oldact: 通过此参数获取之前注册的信号处理函数指针，若不需要则传递 0
+*/
+```
+声明并初始化 sigaction 结构体变量以调用上述函数，该结构体定义如下：
+```c++
+struct sigaction
+{
+    // sa_handler 成员保存信号处理函数的指针值(地址值)
+    void (*sa_handler)(int);
+
+    // sa_mask和sa_flags的所有位默认初始化为0
+    sigset_t sa_mask;
+    int sa_flags;
+};
+```
+
+[sigaction.c](./sigaction.c)
+
+```
+gcc sigaction.c -o sigaction
+./sigaction
+```
+![](https://s2.ax1x.com/2019/02/09/kUkRII.png)
+
+#### 10.3.5 利用信号处理技术消灭僵尸进程
+
+子进程终止时将尝试SIGCHLD信号，利用这一点，我们可以完成消灭僵尸进程
+
+[remove_zomebie.c](./remove_zomebie.c)
+
+```
+gcc remove_zomebie.c -o zombie
+./zombie
+```
+![](https://s2.ax1x.com/2019/02/09/kUAlTA.png)
+
+### 10.4 基于多任务的并发服务器
+
+#### 10.4.1 基于进程的并发服务器模型
+
+![](https://camo.githubusercontent.com/fc1ea110db4649c68d5d42335c9806295113c626/68747470733a2f2f692e6c6f6c692e6e65742f323031392f30312f32312f356334353336363463646532362e706e67)
+
+可以看出，每当有客户端请求服务(连接请求)时，回声服务器端都创建子进程提供服务。步骤
+- 1. 回声服务器端(父进程)通过调用accept函数受理连接请求。
+- 2. 此时获取的套接字文件描述符创建并传递给子进程。
+- 3. 子进程利用传递来的文件描述符提供服务
+
+因为子进程赋值父进程拥有的所有资源，实际上不要另外经过传递文件描述符的过程
+
+#### 10.4.2 实现并发服务器
+
+[echo_mpserv.c](./echo_mpserv.c)
