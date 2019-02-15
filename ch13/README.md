@@ -47,4 +47,4 @@ MSG_OOB可选项用于传输"带外数据"紧急消息。MSG_OOB可选项用于�
 
 [oob_recv.c](./oob_recv.c)
 
-紧急消息的传输比接收简单，只需要在调用send时指定MSG_OOB可选项即可
+紧急消息的传输比接收简单，只需要在调用send时指定MSG_OOB可选项即可。
