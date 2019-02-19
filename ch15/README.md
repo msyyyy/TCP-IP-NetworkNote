@@ -32,4 +32,74 @@
 - 有时可能频繁调用fflush函数
 - 需要以FILE结构体指针的形式返回文件描述符
 
-打开文件时，如果希望同时进行读写操作，则应以r+，w+，a+模式打开，但因为缓冲的缘故
+打开文件时，如果希望同时进行读写操作，则应以r+，w+，a+模式打开，但因为缓冲的缘故，每次切换读写工作状态时应调用fflush函数。这也会影响基于缓冲的性能提高。而且为了使用标准I/O函数，需要FILE结构体指针。而创建套接字时默认返回文件描述符，所以需要将文件描述符转化为FILE指针
+
+### 15.2 使用标准I/O函数
+
+#### 15.2.1 利用fdopen函数转换为FILE结构体指针
+
+通过fdopen函数将创建套接字时返回的文件描述符转化为标准I/O中的FILE结构体指针
+
+```c++
+#include <stdio.h>
+// 成功时返回转换的FILE结构体指针，失败时返回NULL
+FILE *fdopen(int fildes, const char * mode);
+/*
+fildes : 需要转换的文件描述符
+mode   : 将要创建的FILE结构体指针的模式(mode)信息
+*/
+```
+
+[desto.c](./desto.c)
+
+```
+gcc desto.c -o desto
+./desto
+cat data.dat
+```
+
+![](https://s2.ax1x.com/2019/02/19/kgNOtP.png)
+
+文件描述符转换为 FILE 指针，并可以通过该指针调用标准 I/O 函数。
+
+#### 15.2.2 利用fileno函数转换为文件描述符
+
+```c++
+#include <stdio.h>
+// 成功时返回转换后的文件描述符，失败时返回-1
+int fileno(FILE　* stream);
+```
+
+[todes.c](./todes.c)
+
+![](https://s2.ax1x.com/2019/02/19/kgUYcD.png)
+
+### 15.3 基于套接字的标准I/O函数使用
+
+把第四章的回声客户端和回声服务端的内容改为基于标准 I/O 函数的数据交换形式。
+
+[echo_client.c](./echo_client.c)
+
+[echo_stdserv.c](./echo_stdserv.c)
+
+```
+gcc echo_client.c -o eclient
+gcc echo_stdserv.c -o eserver
+```
+
+### 15.4 习题
+
+> 以下答案仅代表本人个人观点，可能不是正确答案
+
+1. **请说明标准 I/O 的 2 个优点。他为何拥有这 2 个优点？**
+
+答：1.具有良好移植性，2. 可以利用缓冲提供性能。  标准函数是按ANSIC标准定义的，标准I/O有额外的缓冲
+
+2. **利用标准 I/O 函数传输数据时，下面的说法是错误的：**
+
+> 调用 fputs 函数传输数据时，调用后应立即开始发送！
+
+**为何上述说法是错误的？为达到这种效果应该添加哪些处理过程？**
+
+答: 只是传输到了缓冲中，需要利用fflush函数刷新缓冲区
+
